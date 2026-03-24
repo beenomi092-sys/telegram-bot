@@ -10,7 +10,6 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 def main():
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # Add handlers
     application.add_handler(get_registration_handler())
     application.add_handler(get_welcome_handler())
     
