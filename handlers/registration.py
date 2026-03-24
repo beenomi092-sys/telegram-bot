@@ -6,11 +6,7 @@ from utils.excel_handler import save_to_excel
 from utils.image_handler import save_image
 import os
 
-# States
-ASK_REASON, ASK_CITY, ASK_NATIONALITY, ASK_NAME, ASK_AGE, ASK_VISA, ASK_JOB_TYPE, ASK_EXPERIENCE, ASK_OTHER_REASON, ASK_CURRENT_POSITION, ASK_LANGUAGE, ASK_SALARY, ASK_PASSPORT, ASK_PHOTO = range(14)
-
-# Visa specific states
-ASK_VISA_COUNTRY, ASK_VISA_TYPE, ASK_VISA_DURATION, ASK_VISA_PASSPORT_PHOTO, ASK_VISA_ID_PHOTO = range(14, 19)
+ASK_REASON, ASK_FORM = range(2)
 
 user_data = {}
 
@@ -19,14 +15,14 @@ async def start(update: Update, context):
     
     if update.message.chat.type == "private":
         keyboard = [
-            [InlineKeyboardButton("💼 Find Work", callback_data='find_work')],
-            [InlineKeyboardButton("🛂 Apply Visa", callback_data='apply_visa')],
+            [InlineKeyboardButton("💼 Apply for Job", callback_data='find_work')],
+            [InlineKeyboardButton("🛂 Apply for Visa", callback_data='apply_visa')],
             [InlineKeyboardButton("ℹ️ Other Information", callback_data='other_info')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
-            "🎯 *Welcome!*\n\nMay I know why you are here?",
+            "🎯 *Welcome!*\n\nPlease select an option:",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
@@ -35,9 +31,9 @@ async def start(update: Update, context):
     elif update.message.chat.type in ["group", "supergroup"]:
         await update.message.delete()
         await update.message.reply_text(
-            f"👋 Hi {user.first_name}! Please click the button below to start registration in private chat:",
+            f"👋 Hi {user.first_name}! Please click the button below:",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔑 Start Registration", url=f"https://t.me/{context.bot.username}")]
+                [InlineKeyboardButton("🔑 Start", url=f"https://t.me/{context.bot.username}")]
             ])
         )
         return ConversationHandler.END
@@ -52,329 +48,201 @@ async def button_handler(update: Update, context):
     user_data[user_id]['user_id'] = user_id
     
     if query.data == 'find_work':
-        user_data[user_id]['reason'] = 'Find Work'
         user_data[user_id]['type'] = 'work'
-        await query.edit_message_text("📍 *Where do you want to find work?*\n\nPlease send the city name:", parse_mode='Markdown')
-        return ASK_CITY
+        form = (
+            "📝 *Job Application Form*\n\n"
+            "Please fill all details below and send:\n\n"
+            "1️⃣ *Full Name:*\n"
+            "2️⃣ *Age:*\n"
+            "3️⃣ *Nationality:*\n"
+            "4️⃣ *City:*\n"
+            "5️⃣ *Job Position:* (Developer/Translator/Receptionist/Other)\n"
+            "6️⃣ *Experience:* (years)\n"
+            "7️⃣ *Current Position:*\n"
+            "8️⃣ *Languages:*\n"
+            "9️⃣ *Salary Expectation:*\n"
+            "🔟 *Passport Number:*\n\n"
+            "Type /cancel to cancel"
+        )
+        await query.edit_message_text(form, parse_mode='Markdown')
+        return ASK_FORM
+        
     elif query.data == 'apply_visa':
-        user_data[user_id]['reason'] = 'Apply Visa'
         user_data[user_id]['type'] = 'visa'
-        await query.edit_message_text("🌍 *Which country do you want to apply for visa?*\n\nPlease send the country name:", parse_mode='Markdown')
-        return ASK_VISA_COUNTRY
+        form = (
+            "✈️ *Visa Application Form*\n\n"
+            "Please fill all details below and send:\n\n"
+            "1️⃣ *Full Name:*\n"
+            "2️⃣ *Age:*\n"
+            "3️⃣ *Nationality:*\n"
+            "4️⃣ *Country to Apply:*\n"
+            "5️⃣ *Visa Type:* (Work/Tourist/Student/Medical/Family)\n"
+            "6️⃣ *Duration:* (3/6/12/24 months)\n"
+            "7️⃣ *Passport Number:*\n\n"
+            "📸 *After filling, please send your Passport Photo and ID Card Photo separately.*\n\n"
+            "Type /cancel to cancel"
+        )
+        await query.edit_message_text(form, parse_mode='Markdown')
+        return ASK_FORM
+        
     elif query.data == 'other_info':
-        user_data[user_id]['reason'] = 'Other Information'
         user_data[user_id]['type'] = 'other'
-        await query.edit_message_text("ℹ️ *Please tell us your reason for joining:*\n\nSend your message:", parse_mode='Markdown')
-        return ASK_OTHER_REASON
-
-# ==================== VISA SPECIFIC HANDLERS ====================
-
-async def visa_country_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['visa_country'] = update.message.text
-    
-    keyboard = [
-        [InlineKeyboardButton("✈️ Work Visa", callback_data='visa_work')],
-        [InlineKeyboardButton("🏖️ Tourist Visa", callback_data='visa_tourist')],
-        [InlineKeyboardButton("📚 Student Visa", callback_data='visa_student')],
-        [InlineKeyboardButton("🏥 Medical Visa", callback_data='visa_medical')],
-        [InlineKeyboardButton("👨‍👩‍👧 Family Visa", callback_data='visa_family')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        "🪪 *What type of visa do you need?*",
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
-    )
-    return ASK_VISA_TYPE
-
-async def visa_type_handler(update: Update, context):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    
-    visa_types = {
-        'visa_work': 'Work Visa',
-        'visa_tourist': 'Tourist Visa',
-        'visa_student': 'Student Visa',
-        'visa_medical': 'Medical Visa',
-        'visa_family': 'Family Visa'
-    }
-    user_data[user_id]['visa_type'] = visa_types.get(query.data, 'Other')
-    
-    keyboard = [
-        [InlineKeyboardButton("3 Months", callback_data='3_months')],
-        [InlineKeyboardButton("6 Months", callback_data='6_months')],
-        [InlineKeyboardButton("1 Year", callback_data='1_year')],
-        [InlineKeyboardButton("2 Years", callback_data='2_years')],
-        [InlineKeyboardButton("Other", callback_data='other_duration')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.edit_message_text(
-        "📅 *How long do you need the visa for?*",
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
-    )
-    return ASK_VISA_DURATION
-
-async def visa_duration_handler(update: Update, context):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    
-    durations = {
-        '3_months': '3 Months',
-        '6_months': '6 Months',
-        '1_year': '1 Year',
-        '2_years': '2 Years',
-        'other_duration': 'Other'
-    }
-    user_data[user_id]['visa_duration'] = durations.get(query.data, 'Other')
-    
-    if query.data == 'other_duration':
         await query.edit_message_text(
-            "📅 *Please specify the duration you need:*\n\nSend your answer:",
+            "ℹ️ *Please tell us your reason for contacting us:*\n\n"
+            "Send your message below:",
             parse_mode='Markdown'
         )
-        return ASK_VISA_DURATION
-    else:
-        await query.edit_message_text(
-            "📸 *Please send a clear photo of your passport (first page)*\n\n"
-            "Make sure all details are visible:",
+        return ASK_FORM
+
+async def form_handler(update: Update, context):
+    user_id = update.message.from_user.id
+    text = update.message.text
+    
+    if text == '/cancel':
+        await update.message.reply_text("❌ Cancelled. Type /start to begin again.")
+        return ConversationHandler.END
+    
+    user_data[user_id]['form_data'] = text
+    
+    if user_data[user_id]['type'] == 'work':
+        # Parse work form data
+        lines = text.strip().split('\n')
+        data = {}
+        for line in lines:
+            if line.startswith('1️⃣') or line.startswith('1'):
+                data['name'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('2️⃣') or line.startswith('2'):
+                data['age'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('3️⃣') or line.startswith('3'):
+                data['nationality'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('4️⃣') or line.startswith('4'):
+                data['city'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('5️⃣') or line.startswith('5'):
+                data['job_type'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('6️⃣') or line.startswith('6'):
+                data['experience'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('7️⃣') or line.startswith('7'):
+                data['current_position'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('8️⃣') or line.startswith('8'):
+                data['languages'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('9️⃣') or line.startswith('9'):
+                data['salary'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('🔟') or line.startswith('10'):
+                data['passport'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+        
+        for key, value in data.items():
+            user_data[user_id][key] = value
+        user_data[user_id]['job_type'] = data.get('job_type', 'N/A')
+        
+        save_to_excel(user_data[user_id], EXCEL_FILE_PATH)
+        
+        await update.message.reply_text(
+            f"✅ *Application Submitted!*\n\n"
+            f"Thank you {data.get('name', 'User')}!\n\n"
+            f"📋 *Your Application:*\n"
+            f"👤 Name: {data.get('name', 'N/A')}\n"
+            f"💼 Job: {data.get('job_type', 'N/A')}\n"
+            f"📍 City: {data.get('city', 'N/A')}\n\n"
+            f"Our {DEPARTMENT_NAME} will contact you soon!\n\n"
+            f"Good luck! 🍀",
             parse_mode='Markdown'
         )
-        return ASK_VISA_PASSPORT_PHOTO
-
-async def visa_duration_text_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['visa_duration'] = update.message.text
-    await update.message.reply_text(
-        "📸 *Please send a clear photo of your passport (first page)*\n\n"
-        "Make sure all details are visible:",
-        parse_mode='Markdown'
-    )
-    return ASK_VISA_PASSPORT_PHOTO
-
-async def visa_passport_photo_handler(update: Update, context):
-    user_id = update.message.from_user.id
+        
+    elif user_data[user_id]['type'] == 'visa':
+        # Parse visa form data
+        lines = text.strip().split('\n')
+        data = {}
+        for line in lines:
+            if line.startswith('1️⃣') or line.startswith('1'):
+                data['name'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('2️⃣') or line.startswith('2'):
+                data['age'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('3️⃣') or line.startswith('3'):
+                data['nationality'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('4️⃣') or line.startswith('4'):
+                data['visa_country'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('5️⃣') or line.startswith('5'):
+                data['visa_type'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('6️⃣') or line.startswith('6'):
+                data['visa_duration'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+            elif line.startswith('7️⃣') or line.startswith('7'):
+                data['passport'] = line.split(':', 1)[-1].strip() if ':' in line else line.split(')', 1)[-1].strip()
+        
+        for key, value in data.items():
+            user_data[user_id][key] = value
+        
+        # Ask for photos
+        user_data[user_id]['waiting_photo'] = True
+        user_data[user_id]['photo_step'] = 'passport'
+        await update.message.reply_text(
+            f"✅ *Form Received!*\n\n"
+            f"Now please send your *Passport Photo* 📸",
+            parse_mode='Markdown'
+        )
+        return ASK_FORM
     
-    if update.message.photo:
-        user_data[user_id]['passport_photo'] = "Yes"
-        photo_file = await update.message.photo[-1].get_file()
-        saved_path = save_image(photo_file, user_id, IMAGES_FOLDER)
-        if saved_path:
-            user_data[user_id]['passport_photo_path'] = saved_path
-        await update.message.reply_text("✅ *Passport photo saved!*", parse_mode='Markdown')
-    else:
-        user_data[user_id]['passport_photo'] = "No"
-        await update.message.reply_text("⚠️ No photo received. Skipping...", parse_mode='Markdown')
+    elif user_data[user_id]['type'] == 'other':
+        user_data[user_id]['message'] = text
+        save_to_excel(user_data[user_id], EXCEL_FILE_PATH)
+        await update.message.reply_text(
+            f"✅ *Message Received!*\n\n"
+            f"Thank you! We will get back to you soon.",
+            parse_mode='Markdown'
+        )
     
-    await update.message.reply_text(
-        "🪪 *Please send a clear photo of your National ID Card / CNIC*\n\n"
-        "Both sides if possible:",
-        parse_mode='Markdown'
-    )
-    return ASK_VISA_ID_PHOTO
-
-async def visa_id_photo_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    
-    if update.message.photo:
-        user_data[user_id]['id_photo'] = "Yes"
-        photo_file = await update.message.photo[-1].get_file()
-        saved_path = save_image(photo_file, user_id, IMAGES_FOLDER)
-        if saved_path:
-            user_data[user_id]['id_photo_path'] = saved_path
-        await update.message.reply_text("✅ *ID photo saved!*", parse_mode='Markdown')
-    else:
-        user_data[user_id]['id_photo'] = "No"
-        await update.message.reply_text("⚠️ No photo received. Skipping...", parse_mode='Markdown')
-    
-    # Save all visa data to Excel
-    save_to_excel(user_data[user_id], EXCEL_FILE_PATH)
-    
-    # Professional Visa Completion Message
-    await update.message.reply_text(
-        f"✅ *VISA APPLICATION SUCCESSFULLY SUBMITTED!*\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🎉 *Thank You, {user_data[user_id].get('name', user_data[user_id].get('username', 'User'))}!*\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"📋 *Application Summary:*\n"
-        f"┌─────────────────────────────────┐\n"
-        f"│ 🌍 *Country:* {user_data[user_id].get('visa_country', 'N/A')}\n"
-        f"│ 🪪 *Visa Type:* {user_data[user_id].get('visa_type', 'N/A')}\n"
-        f"│ 📅 *Duration:* {user_data[user_id].get('visa_duration', 'N/A')}\n"
-        f"│ 📸 *Passport Photo:* {'✅ Received' if user_data[user_id].get('passport_photo') == 'Yes' else '❌ Not Received'}\n"
-        f"│ 🪪 *ID Card Photo:* {'✅ Received' if user_data[user_id].get('id_photo') == 'Yes' else '❌ Not Received'}\n"
-        f"└─────────────────────────────────┘\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"✈️ *Our Travel Agency Team will contact you within 24-48 hours!*\n\n"
-        f"📞 *You will receive:*\n"
-        f"• Consultation call from our visa expert\n"
-        f"• Document checklist via email\n"
-        f"• Visa processing status updates\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💡 *Need immediate assistance?*\n"
-        f"📧 Email: support@travelagency.com\n"
-        f"📱 WhatsApp: +1234567890\n\n"
-        f"⭐ *Thank you for choosing our services!*\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"*Best of luck with your visa application!* 🍀",
-        parse_mode='Markdown'
-    )
     return ConversationHandler.END
-
-# ==================== WORK SPECIFIC HANDLERS ====================
-
-async def city_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['city'] = update.message.text
-    await update.message.reply_text("🌍 *What is your nationality?*\n\nPlease send your nationality:", parse_mode='Markdown')
-    return ASK_NATIONALITY
-
-async def nationality_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['nationality'] = update.message.text
-    await update.message.reply_text("👤 *What is your name?*\n\nPlease send your full name:", parse_mode='Markdown')
-    return ASK_NAME
-
-async def name_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['name'] = update.message.text
-    await update.message.reply_text("🎂 *What is your age?*\n\nPlease send your age:", parse_mode='Markdown')
-    return ASK_AGE
-
-async def age_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['age'] = update.message.text
-    keyboard = [[InlineKeyboardButton("✅ Yes", callback_data='visa_yes')], [InlineKeyboardButton("❌ No", callback_data='visa_no')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("🪪 *Do you have a valid visa or passport?*", reply_markup=reply_markup, parse_mode='Markdown')
-    return ASK_VISA
-
-async def visa_handler(update: Update, context):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    user_data[user_id]['has_visa'] = "Yes" if query.data == 'visa_yes' else "No"
-    keyboard = [
-        [InlineKeyboardButton("👨‍💻 Developer", callback_data='job_developer')],
-        [InlineKeyboardButton("📝 Translator", callback_data='job_translator')],
-        [InlineKeyboardButton("📞 Receptionist", callback_data='job_receptionist')],
-        [InlineKeyboardButton("❓ Other", callback_data='job_other')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text("💼 *What are your requirements?*\n\nPlease select your desired job position:", reply_markup=reply_markup, parse_mode='Markdown')
-    return ASK_JOB_TYPE
-
-async def job_type_handler(update: Update, context):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    
-    if query.data == 'job_developer':
-        user_data[user_id]['job_type'] = 'Developer'
-        await query.edit_message_text("💻 *How many years of experience do you have as a Developer?*", parse_mode='Markdown')
-        return ASK_EXPERIENCE
-    elif query.data == 'job_translator':
-        user_data[user_id]['job_type'] = 'Translator'
-        await query.edit_message_text("📝 *How many years of experience do you have as a Translator?*", parse_mode='Markdown')
-        return ASK_EXPERIENCE
-    elif query.data == 'job_receptionist':
-        user_data[user_id]['job_type'] = 'Receptionist'
-        await query.edit_message_text("📞 *How many years of experience do you have as a Receptionist?*", parse_mode='Markdown')
-        return ASK_EXPERIENCE
-    elif query.data == 'job_other':
-        user_data[user_id]['job_type'] = 'Other'
-        await query.edit_message_text("❓ *Please tell us about your requirements:*", parse_mode='Markdown')
-        return ASK_OTHER_REASON
-
-async def experience_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['experience'] = update.message.text
-    await update.message.reply_text("💼 *What is your current position?*", parse_mode='Markdown')
-    return ASK_CURRENT_POSITION
-
-async def current_position_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['current_position'] = update.message.text
-    await update.message.reply_text("🗣️ *What languages do you speak?*", parse_mode='Markdown')
-    return ASK_LANGUAGE
-
-async def language_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['languages'] = update.message.text
-    await update.message.reply_text("💰 *What is your salary expectation?*", parse_mode='Markdown')
-    return ASK_SALARY
-
-async def salary_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['salary_expectation'] = update.message.text
-    await update.message.reply_text("🪪 *Please provide your passport number:*", parse_mode='Markdown')
-    return ASK_PASSPORT
-
-async def passport_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['passport_number'] = update.message.text
-    await update.message.reply_text("📸 *Please send your profile picture* (optional)\n\nType /skip to continue:", parse_mode='Markdown')
-    return ASK_PHOTO
 
 async def photo_handler(update: Update, context):
     user_id = update.message.from_user.id
     
+    if user_id not in user_data or not user_data[user_id].get('waiting_photo'):
+        await update.message.reply_text("Please use /start to begin.")
+        return ConversationHandler.END
+    
     if update.message.photo:
-        user_data[user_id]['has_photo'] = "Yes"
         photo_file = await update.message.photo[-1].get_file()
         saved_path = save_image(photo_file, user_id, IMAGES_FOLDER)
-        if saved_path:
-            user_data[user_id]['photo_path'] = saved_path
+        
+        if user_data[user_id].get('photo_step') == 'passport':
+            user_data[user_id]['passport_photo'] = saved_path
+            user_data[user_id]['photo_step'] = 'id'
+            await update.message.reply_text("✅ *Passport photo saved!*\n\nNow please send your *ID Card Photo* 📇", parse_mode='Markdown')
+            return ASK_FORM
+        else:
+            user_data[user_id]['id_photo'] = saved_path
+            save_to_excel(user_data[user_id], EXCEL_FILE_PATH)
+            await update.message.reply_text(
+                f"✅ *Visa Application Complete!*\n\n"
+                f"✈️ *Our Travel Agency will contact you soon!*\n\n"
+                f"Good luck! 🍀",
+                parse_mode='Markdown'
+            )
+            return ConversationHandler.END
     else:
-        user_data[user_id]['has_photo'] = "No"
-    
-    save_to_excel(user_data[user_id], EXCEL_FILE_PATH)
-    
-    await update.message.reply_text(
-        f"✅ *Registration Complete!*\n\n"
-        f"Thank you {user_data[user_id].get('name', '')}!\n\n"
-        f"📋 *Your Information:*\n"
-        f"👤 Name: {user_data[user_id].get('name', 'N/A')}\n"
-        f"💼 Job: {user_data[user_id].get('job_type', 'N/A')}\n"
-        f"📍 City: {user_data[user_id].get('city', 'N/A')}\n"
-        f"🌍 Nationality: {user_data[user_id].get('nationality', 'N/A')}\n\n"
-        f"Our {DEPARTMENT_NAME} will contact you soon via inbox.\n\n"
-        f"Good luck! 🍀",
-        parse_mode='Markdown'
-    )
-    return ConversationHandler.END
+        await update.message.reply_text("Please send a photo, or type /skip to skip.")
+        return ASK_FORM
 
 async def skip_photo_handler(update: Update, context):
     user_id = update.message.from_user.id
-    user_data[user_id]['has_photo'] = "No"
-    save_to_excel(user_data[user_id], EXCEL_FILE_PATH)
-    await update.message.reply_text(
-        f"✅ *Registration Complete!*\n\n"
-        f"Thank you {user_data[user_id].get('name', '')}!\n\n"
-        f"📋 *Your Information:*\n"
-        f"👤 Name: {user_data[user_id].get('name', 'N/A')}\n"
-        f"💼 Job: {user_data[user_id].get('job_type', 'N/A')}\n"
-        f"📍 City: {user_data[user_id].get('city', 'N/A')}\n"
-        f"🌍 Nationality: {user_data[user_id].get('nationality', 'N/A')}\n\n"
-        f"Our {DEPARTMENT_NAME} will contact you soon via inbox.\n\n"
-        f"Good luck! 🍀",
-        parse_mode='Markdown'
-    )
-    return ConversationHandler.END
-
-async def other_reason_handler(update: Update, context):
-    user_id = update.message.from_user.id
-    user_data[user_id]['other_reason'] = update.message.text
-    await update.message.reply_text("💼 *What is your current position?*", parse_mode='Markdown')
-    return ASK_CURRENT_POSITION
+    
+    if user_data[user_id].get('photo_step') == 'passport':
+        user_data[user_id]['passport_photo'] = "Skipped"
+        user_data[user_id]['photo_step'] = 'id'
+        await update.message.reply_text("⚠️ Passport photo skipped.\n\nNow please send your *ID Card Photo* or type /skip", parse_mode='Markdown')
+        return ASK_FORM
+    else:
+        user_data[user_id]['id_photo'] = "Skipped"
+        save_to_excel(user_data[user_id], EXCEL_FILE_PATH)
+        await update.message.reply_text(
+            f"✅ *Visa Application Complete!*\n\n"
+            f"✈️ *Our Travel Agency will contact you soon!*\n\n"
+            f"Good luck! 🍀",
+            parse_mode='Markdown'
+        )
+        return ConversationHandler.END
 
 async def cancel(update: Update, context):
-    await update.message.reply_text("❌ Registration cancelled. Type /start to begin again.")
+    await update.message.reply_text("❌ Cancelled. Type /start to begin again.")
     return ConversationHandler.END
 
 def get_registration_handler():
@@ -382,51 +250,11 @@ def get_registration_handler():
         entry_points=[CommandHandler('start', start)],
         states={
             ASK_REASON: [CallbackQueryHandler(button_handler)],
-            # Visa states
-            ASK_VISA_COUNTRY: [MessageHandler(filters.TEXT & ~filters.COMMAND, visa_country_handler)],
-            ASK_VISA_TYPE: [CallbackQueryHandler(visa_type_handler)],
-            ASK_VISA_DURATION: [
-                CallbackQueryHandler(visa_duration_handler),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, visa_duration_text_handler)
+            ASK_FORM: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, form_handler),
+                MessageHandler(filters.PHOTO, photo_handler),
+                CommandHandler('skip', skip_photo_handler)
             ],
-            ASK_VISA_PASSPORT_PHOTO: [MessageHandler(filters.PHOTO, visa_passport_photo_handler)],
-            ASK_VISA_ID_PHOTO: [MessageHandler(filters.PHOTO, visa_id_photo_handler)],
-            # Work states
-            ASK_CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, city_handler)],
-            ASK_NATIONALITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, nationality_handler)],
-            ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, name_handler)],
-            ASK_AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, age_handler)],
-            ASK_VISA: [CallbackQueryHandler(visa_handler)],
-            ASK_JOB_TYPE: [CallbackQueryHandler(job_type_handler)],
-            ASK_EXPERIENCE: [MessageHandler(filters.TEXT & ~filters.COMMAND, experience_handler)],
-            ASK_OTHER_REASON: [MessageHandler(filters.TEXT & ~filters.COMMAND, other_reason_handler)],
-            ASK_CURRENT_POSITION: [MessageHandler(filters.TEXT & ~filters.COMMAND, current_position_handler)],
-            ASK_LANGUAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, language_handler)],
-            ASK_SALARY: [MessageHandler(filters.TEXT & ~filters.COMMAND, salary_handler)],
-            ASK_PASSPORT: [MessageHandler(filters.TEXT & ~filters.COMMAND, passport_handler)],
-            ASK_PHOTO: [MessageHandler(filters.PHOTO, photo_handler), CommandHandler('skip', skip_photo_handler)],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
     )
-
-async def start_registration_from_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
-    user_id = query.from_user.id
-    user_data[user_id] = {}
-    user_data[user_id]['username'] = query.from_user.username or "No username"
-    user_data[user_id]['user_id'] = user_id
-    
-    if query.data == 'find_work':
-        user_data[user_id]['reason'] = 'Find Work'
-        user_data[user_id]['type'] = 'work'
-        await query.edit_message_text("📍 *Where do you want to find work?*\n\nPlease send the city name:", parse_mode='Markdown')
-        return ASK_CITY
-    elif query.data == 'apply_visa':
-        user_data[user_id]['reason'] = 'Apply Visa'
-        user_data[user_id]['type'] = 'visa'
-        await query.edit_message_text("🌍 *Which country do you want to apply for visa?*\n\nPlease send the country name:", parse_mode='Markdown')
-        return ASK_VISA_COUNTRY
-    elif query.data == 'other_info':
-        user_data[user_id]['reason'] = 'Other Information'
-        user_data[user_id]['type'] = 'other'
-        await query.edit_message_text("ℹ️ *Please tell us your reason for joining:*\n\nSend your message:", parse_mode='Markdown')
-        return ASK_OTHER_REASON
